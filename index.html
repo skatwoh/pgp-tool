@@ -583,8 +583,20 @@ async function decryptMsg() {
       privateKey: await openpgp.readPrivateKey({ armoredKey: priv }),
       passphrase: pass || undefined
     });
+    const message = await openpgp.readMessage({ armoredMessage: enc });
+    const msgIDs = message.getEncryptionKeyIDs().map(id => id.toHex().toUpperCase());
+    const privIDs = [privKey.getKeyID().toHex().toUpperCase(), ...privKey.getSubkeys().map(sk => sk.getKeyID().toHex().toUpperCase())];
+    const hasMatch = msgIDs.some(id => privIDs.includes(id));
+
+    if (!hasMatch) {
+      const errM = (lang === 'vi'
+        ? `Khóa bí mật không khớp với tin nhắn. Tin nhắn yêu cầu khóa ID: ${msgIDs.join(', ')}. Khóa của bạn có ID: ${privIDs.join(', ')}.`
+        : `Private key does not match the message. Message requires Key ID: ${msgIDs.join(', ')}. Your key has ID: ${privIDs.join(', ')}.`);
+      throw new Error(errM);
+    }
+
     var result = await openpgp.decrypt({
-      message: await openpgp.readMessage({ armoredMessage: enc }),
+      message,
       decryptionKeys: privKey
     });
     document.getElementById('out-dec').textContent = result.data;
