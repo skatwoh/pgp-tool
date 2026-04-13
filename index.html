@@ -194,7 +194,10 @@ h3 { font-size:13px; font-weight:500; color:var(--text2); font-family:var(--font
       <input type="password" id="dec-pass" />
     </div>
     <div class="mb1">
-      <div class="field-label" id="lbl-encmsg">Tin nhan da ma hoa</div>
+      <div class="field-row">
+        <div class="field-label" id="lbl-encmsg">Tin nhan da ma hoa</div>
+        <button class="btn btn-sm" onclick="formatKey('dec-msg')" id="btn-format-decmsg">Dinh dang</button>
+      </div>
       <textarea id="dec-msg" rows="5" placeholder="-----BEGIN PGP MESSAGE-----"></textarea>
     </div>
     <div class="actions">
@@ -230,7 +233,10 @@ h3 { font-size:13px; font-weight:500; color:var(--text2); font-family:var(--font
           <input type="password" id="sign-pass" />
         </div>
         <div class="mb1">
-          <div class="field-label" id="lbl-signmsg">Tin nhan can ky</div>
+          <div class="field-row">
+            <div class="field-label" id="lbl-signmsg">Tin nhan can ky</div>
+            <button class="btn btn-sm" onclick="formatKey('sign-msg')" id="btn-format-signmsg">Dinh dang</button>
+          </div>
           <textarea id="sign-msg" rows="3"></textarea>
         </div>
         <button class="btn btn-primary" onclick="signMsg()" id="btn-sign">Ky</button>
@@ -257,7 +263,10 @@ h3 { font-size:13px; font-weight:500; color:var(--text2); font-family:var(--font
           <textarea id="ver-pubkey" rows="5" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"></textarea>
         </div>
         <div class="mb1">
-          <div class="field-label" id="lbl-versigned">Tin nhan da ky</div>
+          <div class="field-row">
+            <div class="field-label" id="lbl-versigned">Tin nhan da ky</div>
+            <button class="btn btn-sm" onclick="formatKey('ver-msg')" id="btn-format-vermsg">Dinh dang</button>
+          </div>
           <textarea id="ver-msg" rows="4" placeholder="-----BEGIN PGP SIGNED MESSAGE-----"></textarea>
         </div>
         <button class="btn btn-primary" onclick="verifyMsg()" id="btn-verify">Xac minh</button>
@@ -315,7 +324,10 @@ var LABELS = {
   'btn-format-enc': { vi:'Dinh dang',            en:'Format' },
   'btn-format-dec': { vi:'Dinh dang',            en:'Format' },
   'btn-format-sign': { vi:'Dinh dang',           en:'Format' },
-  'btn-format-ver': { vi:'Dinh dang',            en:'Format' }
+  'btn-format-ver': { vi:'Dinh dang',            en:'Format' },
+  'btn-format-decmsg': { vi:'Dinh dang',         en:'Format' },
+  'btn-format-signmsg': { vi:'Dinh dang',        en:'Format' },
+  'btn-format-vermsg': { vi:'Dinh dang',         en:'Format' }
 };
 
 var MSG = {
@@ -387,7 +399,7 @@ function cleanKey(raw) {
     // fallback nếu parse fail
   }
 
-  // 🔥 clean tiếp
+  // 🔥 clean tiếp các artifact khác
   s = s
     .replace(/\\r/g, '')
     .replace(/\\n/g, '\n')
@@ -395,45 +407,47 @@ function cleanKey(raw) {
     .replace(/\\(?:\r\n|\n)/g, '')
     .replace(/\\$/gm, '');
 
-  // 🔥 loại bỏ ký tự rác, đưa về mảng các dòng sạch
-  const allLines = s.split('\n').map(l => l.trim()).filter(l => l !== '');
+  const lines = s.split('\n').map(l => l.trim()).filter(l => l !== '');
+  if (lines.length === 0) return '';
 
-  if (allLines.length === 0) return '';
+  let result = [];
+  let i = 0;
+  while (i < lines.length) {
+    let line = lines[i];
 
-  let bodyStartIndex = -1;
-  for (let i = 0; i < allLines.length; i++) {
-    const line = allLines[i];
-    if (line.startsWith('-----BEGIN PGP')) continue;
-    if (line.includes(':')) continue;
+    // Bắt đầu 1 khối PGP
+    if (line.startsWith('-----BEGIN PGP')) {
+      result.push(line);
+      i++;
 
-    // Nếu dòng này không phải header, thì nó là khởi đầu của body
-    bodyStartIndex = i;
-    break;
-  }
-
-  if (bodyStartIndex !== -1) {
-    const headers = allLines.slice(0, bodyStartIndex);
-    const body = allLines.slice(bodyStartIndex);
-
-    // Tách phần body thực sự (base64) và phần tail (-----END PGP...)
-    let realBody = [];
-    let tail = [];
-    for (let line of body) {
-      if (line.startsWith('-----END PGP')) {
-        tail.push(line);
-      } else {
-        if (tail.length === 0) {
-          realBody.push(line);
-        } else {
-          tail.push(line);
-        }
+      // Đọc Headers
+      while (i < lines.length && lines[i].includes(':')) {
+        result.push(lines[i]);
+        i++;
       }
-    }
 
-    return headers.join('\n') + '\n\n' + realBody.join('\n') + (tail.length > 0 ? '\n' + tail.join('\n') : '');
+      // Bắt buộc 1 dòng trống sau headers (hoặc sau BEGIN nếu ko có headers)
+      result.push('');
+
+      // Đọc Body cho đến hết hoặc đến END
+      while (i < lines.length && !lines[i].startsWith('-----END PGP')) {
+        result.push(lines[i]);
+        i++;
+      }
+
+      // Đọc dòng END
+      if (i < lines.length && lines[i].startsWith('-----END PGP')) {
+        result.push(lines[i]);
+        i++;
+      }
+    } else {
+      // Không phải trong khối PGP (text bình thường hoặc rác)
+      result.push(line);
+      i++;
+    }
   }
 
-  return allLines.join('\n');
+  return result.join('\n').trim();
 }
 
 function formatKey(id) {
