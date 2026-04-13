@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PGP Tool</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #242424;
+  --border: rgba(255,255,255,0.10); --border2: rgba(255,255,255,0.18);
+  --text: #f0ede8; --text2: #999; --text3: #555;
+  --accent: #c8f03d; --accent-dim: rgba(200,240,61,0.12);
+  --ok: #4ade80; --ok-bg: rgba(74,222,128,0.10);
+  --err: #f87171; --err-bg: rgba(248,113,113,0.10);
+  --r: 8px; --font-mono: 'JetBrains Mono','Fira Code',monospace;
+  --font-sans: 'DM Sans',system-ui,sans-serif;
+}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+body { background:var(--bg); color:var(--text); font-family:var(--font-sans); min-height:100vh; }
+.header {
+  border-bottom:0.5px solid var(--border); padding:1.25rem 2rem;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; background:rgba(15,15,15,0.94);
+  backdrop-filter:blur(12px); z-index:10;
+}
+.logo { font-family:var(--font-mono); font-size:15px; font-weight:500; letter-spacing:.08em; color:var(--accent); }
+.logo span { color:var(--text2); }
+.lang-toggle { display:flex; gap:6px; }
+.lang-btn {
+  padding:5px 14px; border:0.5px solid var(--border2); border-radius:20px;
+  background:transparent; color:var(--text2); font-size:12px; cursor:pointer; transition:all .15s;
+}
+.lang-btn:hover { border-color:var(--accent); color:var(--text); }
+.lang-btn.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.container { max-width:880px; margin:0 auto; padding:2rem; }
+.tabs { display:flex; gap:4px; border-bottom:0.5px solid var(--border); margin-bottom:2rem; overflow-x:auto; }
+.tab {
+  padding:10px 18px; font-size:13px; cursor:pointer; border:none;
+  background:transparent; color:var(--text3); font-family:var(--font-mono);
+  border-bottom:2px solid transparent; white-space:nowrap; transition:all .15s;
+}
+.tab:hover { color:var(--text2); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.section { display:none; }
+.section.active { display:block; animation:fadeIn .2s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+.field-label { font-size:11px; color:var(--text3); letter-spacing:.1em; text-transform:uppercase; font-family:var(--font-mono); margin-bottom:7px; }
+textarea, input[type=text], input[type=password] {
+  width:100%; padding:10px 14px; border:0.5px solid var(--border); border-radius:var(--r);
+  background:var(--bg2); color:var(--text); font-family:var(--font-mono); font-size:12px;
+  resize:vertical; transition:border .15s; line-height:1.6;
+}
+textarea:focus, input:focus { outline:none; border-color:var(--accent); }
+textarea::placeholder, input::placeholder { color:var(--text3); }
+.mb1 { margin-bottom:1rem; }
+.row { display:flex; gap:12px; margin-bottom:1rem; }
+.col { flex:1; }
+.btn {
+  display:inline-flex; align-items:center; gap:7px; padding:9px 22px;
+  border:0.5px solid var(--border2); border-radius:var(--r); background:transparent;
+  color:var(--text); font-size:13px; font-family:var(--font-mono); cursor:pointer; transition:all .15s;
+}
+.btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+.btn:active { transform:scale(.98); }
+.btn-primary { background:var(--accent); color:#0f0f0f; border-color:var(--accent); font-weight:500; }
+.btn-primary:hover { background:#d9ff45; border-color:#d9ff45; color:#0f0f0f; }
+.btn-sm { padding:4px 12px; font-size:11px; }
+.output-box {
+  background:var(--bg3); border:0.5px solid var(--border); border-radius:var(--r);
+  padding:12px 14px; font-size:11px; font-family:var(--font-mono);
+  word-break:break-all; color:var(--text); white-space:pre-wrap; line-height:1.6; overflow-y:auto;
+}
+.status { font-size:12px; font-family:var(--font-mono); padding:9px 14px; border-radius:var(--r); margin-top:.75rem; border:0.5px solid transparent; }
+.status.ok  { background:var(--ok-bg);  color:var(--ok);  border-color:rgba(74,222,128,.2); }
+.status.err { background:var(--err-bg); color:var(--err); border-color:rgba(248,113,113,.2); }
+.warn-box { display:none; font-size:11px; color:var(--err); font-family:var(--font-mono); margin-top:5px; padding:6px 10px; background:var(--err-bg); border-radius:var(--r); }
+h3 { font-size:13px; font-weight:500; color:var(--text2); font-family:var(--font-mono); letter-spacing:.05em; margin-bottom:1.25rem; text-transform:uppercase; }
+.key-pair { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:1.25rem; }
+.actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:.75rem; }
+.info-text { font-size:12px; color:var(--text3); margin-top:.75rem; line-height:1.6; font-family:var(--font-mono); padding:10px 14px; border-left:2px solid var(--border2); }
+.sign-grid { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+.field-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.field-row .field-label { margin-bottom:0; }
+@media (max-width:620px) {
+  .container { padding:1rem; }
+  .key-pair, .sign-grid, .row { grid-template-columns:1fr; flex-direction:column; }
+  .header { padding:1rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">PGP<span>.tool</span></div>
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('vi')">&#127987;&#65039; VI</button>
+    <button class="lang-btn" onclick="setLang('en')">&#127468;&#127463; EN</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('keygen')" id="tab-keygen">// tao khoa</button>
+    <button class="tab" onclick="showTab('encrypt')" id="tab-encrypt">// ma hoa</button>
+    <button class="tab" onclick="showTab('decrypt')" id="tab-decrypt">// giai ma</button>
+    <button class="tab" onclick="showTab('sign')" id="tab-sign">// ky &amp; xac minh</button>
+  </div>
+
+  <!-- KEYGEN -->
+  <div class="section active" id="sec-keygen">
+    <h3 id="h-keygen">Tao cap khoa RSA 2048-bit</h3>
+    <div class="row">
+      <div class="col">
+        <div class="field-label" id="lbl-name">Ten / Email</div>
+        <input type="text" id="kg-name" placeholder="nguyen@example.com" />
+      </div>
+      <div class="col">
+        <div class="field-label" id="lbl-pass">Cum mat khau (tuy chon)</div>
+        <input type="password" id="kg-pass" />
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="generateKeys()" id="btn-gen">Tao khoa</button>
+    </div>
+    <div id="kg-status"></div>
+    <div id="kg-out" style="display:none">
+      <div class="key-pair">
+        <div>
+          <div class="field-label" id="lbl-pubkey">Khoa cong khai</div>
+          <div class="output-box" id="out-pub" style="height:200px"></div>
+          <div class="actions"><button class="btn btn-sm" onclick="copyText('out-pub',this)" id="cp-pub">Sao chep</button></div>
+        </div>
+        <div>
+          <div class="field-label" id="lbl-privkey">Khoa bi mat</div>
+          <div class="output-box" id="out-priv" style="height:200px"></div>
+          <div class="actions"><button class="btn btn-sm" onclick="copyText('out-priv',this)" id="cp-priv">Sao chep</button></div>
+        </div>
+      </div>
+      <div class="info-text" id="info-keygen">Giu bi mat khoa bi mat. Chia se khoa cong khai de nguoi khac gui tin ma hoa cho ban.</div>
+    </div>
+  </div>
+
+  <!-- ENCRYPT -->
+  <div class="section" id="sec-encrypt">
+    <h3 id="h-enc">Ma hoa tin nhan</h3>
+    <div class="mb1">
+      <div class="field-row">
+        <div class="field-label" id="lbl-recvpub">Khoa cong khai nguoi nhan</div>
+        <label class="btn btn-sm" style="cursor:pointer">
+          &#128193; <span id="lbl-enc-file">Tai file .asc</span>
+          <input type="file" accept=".asc,.txt,.key,.pem" style="display:none" onchange="loadFile(event,'enc-pubkey')">
+        </label>
+      </div>
+      <textarea id="enc-pubkey" rows="5" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----" oninput="checkKeyType(this,'PUBLIC','enc-warn')"></textarea>
+      <div class="warn-box" id="enc-warn">Khoa BI MAT — o nay can khoa CONG KHAI (PUBLIC KEY)</div>
+    </div>
+    <div class="mb1">
+      <div class="field-label" id="lbl-msg">Tin nhan</div>
+      <textarea id="enc-msg" rows="4" placeholder="Nhap noi dung can ma hoa..."></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="encryptMsg()" id="btn-enc">Ma hoa</button>
+    </div>
+    <div id="enc-status"></div>
+    <div id="enc-out" style="display:none;margin-top:1rem">
+      <div class="field-label" id="lbl-encout">Tin nhan da ma hoa</div>
+      <div class="output-box" id="out-enc" style="height:160px"></div>
+      <div class="actions"><button class="btn btn-sm" onclick="copyText('out-enc',this)" id="cp-enc">Sao chep</button></div>
+    </div>
+  </div>
+
+  <!-- DECRYPT -->
+  <div class="section" id="sec-decrypt">
+    <h3 id="h-dec">Giai ma tin nhan</h3>
+    <div class="mb1">
+      <div class="field-row">
+        <div class="field-label" id="lbl-myprivkey">Khoa bi mat cua ban</div>
+        <label class="btn btn-sm" style="cursor:pointer">
+          &#128193; <span id="lbl-dec-file">Tai file .asc</span>
+          <input type="file" accept=".asc,.txt,.key,.pem" style="display:none" onchange="loadFile(event,'dec-privkey')">
+        </label>
+      </div>
+      <textarea id="dec-privkey" rows="5" placeholder="-----BEGIN PGP PRIVATE KEY BLOCK-----"></textarea>
+    </div>
+    <div class="mb1">
+      <div class="field-label" id="lbl-decpass">Cum mat khau (neu co)</div>
+      <input type="password" id="dec-pass" />
+    </div>
+    <div class="mb1">
+      <div class="field-label" id="lbl-encmsg">Tin nhan da ma hoa</div>
+      <textarea id="dec-msg" rows="5" placeholder="-----BEGIN PGP MESSAGE-----"></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="decryptMsg()" id="btn-dec">Giai ma</button>
+    </div>
+    <div id="dec-status"></div>
+    <div id="dec-out" style="display:none;margin-top:1rem">
+      <div class="field-label" id="lbl-decout">Noi dung goc</div>
+      <div class="output-box" id="out-dec"></div>
+    </div>
+  </div>
+
+  <!-- SIGN & VERIFY -->
+  <div class="section" id="sec-sign">
+    <div class="sign-grid">
+      <div>
+        <h3 id="h-sign">Ky tin nhan</h3>
+        <div class="mb1">
+          <div class="field-row">
+            <div class="field-label" id="lbl-signpriv">Khoa bi mat cua ban</div>
+            <label class="btn btn-sm" style="cursor:pointer">
+              &#128193; <span id="lbl-sign-file">Tai file .asc</span>
+              <input type="file" accept=".asc,.txt,.key,.pem" style="display:none" onchange="loadFile(event,'sign-privkey')">
+            </label>
+          </div>
+          <textarea id="sign-privkey" rows="5" placeholder="-----BEGIN PGP PRIVATE KEY BLOCK-----"></textarea>
+        </div>
+        <div class="mb1">
+          <div class="field-label" id="lbl-signpass">Cum mat khau (neu co)</div>
+          <input type="password" id="sign-pass" />
+        </div>
+        <div class="mb1">
+          <div class="field-label" id="lbl-signmsg">Tin nhan can ky</div>
+          <textarea id="sign-msg" rows="3"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="signMsg()" id="btn-sign">Ky</button>
+        <div id="sign-status"></div>
+        <div id="sign-out" style="display:none;margin-top:1rem">
+          <div class="field-label" id="lbl-signout">Chu ky</div>
+          <div class="output-box" id="out-sign" style="height:130px"></div>
+          <div class="actions"><button class="btn btn-sm" onclick="copyText('out-sign',this)" id="cp-sign">Sao chep</button></div>
+        </div>
+      </div>
+      <div>
+        <h3 id="h-verify">Xac minh chu ky</h3>
+        <div class="mb1">
+          <div class="field-row">
+            <div class="field-label" id="lbl-verpub">Khoa cong khai nguoi ky</div>
+            <label class="btn btn-sm" style="cursor:pointer">
+              &#128193; <span id="lbl-ver-file">Tai file .asc</span>
+              <input type="file" accept=".asc,.txt,.key,.pem" style="display:none" onchange="loadFile(event,'ver-pubkey')">
+            </label>
+          </div>
+          <textarea id="ver-pubkey" rows="5" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"></textarea>
+        </div>
+        <div class="mb1">
+          <div class="field-label" id="lbl-versigned">Tin nhan da ky</div>
+          <textarea id="ver-msg" rows="4" placeholder="-----BEGIN PGP SIGNED MESSAGE-----"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="verifyMsg()" id="btn-verify">Xac minh</button>
+        <div id="ver-status"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/openpgp@5.11.2/dist/openpgp.min.js"></script>
+<script>
+var lang = 'vi';
+
+var LABELS = {
+  'tab-keygen':   { vi:'// tao khoa',            en:'// keygen' },
+  'tab-encrypt':  { vi:'// ma hoa',              en:'// encrypt' },
+  'tab-decrypt':  { vi:'// giai ma',             en:'// decrypt' },
+  'tab-sign':     { vi:'// ky & xac minh',       en:'// sign & verify' },
+  'h-keygen':     { vi:'Tao cap khoa RSA 2048-bit', en:'Generate RSA 2048-bit Key Pair' },
+  'lbl-name':     { vi:'Ten / Email',             en:'Name / Email' },
+  'lbl-pass':     { vi:'Cum mat khau (tuy chon)', en:'Passphrase (optional)' },
+  'btn-gen':      { vi:'Tao khoa',               en:'Generate Keys' },
+  'lbl-pubkey':   { vi:'Khoa cong khai',          en:'Public Key' },
+  'lbl-privkey':  { vi:'Khoa bi mat',             en:'Private Key' },
+  'cp-pub':       { vi:'Sao chep',               en:'Copy' },
+  'cp-priv':      { vi:'Sao chep',               en:'Copy' },
+  'info-keygen':  { vi:'Giu bi mat khoa bi mat. Chia se khoa cong khai de nguoi khac gui tin ma hoa cho ban.', en:'Keep your private key secret. Share the public key so others can encrypt messages to you.' },
+  'h-enc':        { vi:'Ma hoa tin nhan',         en:'Encrypt Message' },
+  'lbl-recvpub':  { vi:'Khoa cong khai nguoi nhan', en:"Recipient's Public Key" },
+  'lbl-enc-file': { vi:'Tai file .asc',           en:'Load .asc file' },
+  'lbl-msg':      { vi:'Tin nhan',                en:'Message' },
+  'btn-enc':      { vi:'Ma hoa',                  en:'Encrypt' },
+  'lbl-encout':   { vi:'Tin nhan da ma hoa',      en:'Encrypted Message' },
+  'cp-enc':       { vi:'Sao chep',               en:'Copy' },
+  'h-dec':        { vi:'Giai ma tin nhan',        en:'Decrypt Message' },
+  'lbl-myprivkey':{ vi:'Khoa bi mat cua ban',     en:'Your Private Key' },
+  'lbl-dec-file': { vi:'Tai file .asc',           en:'Load .asc file' },
+  'lbl-decpass':  { vi:'Cum mat khau (neu co)',   en:'Passphrase (if any)' },
+  'lbl-encmsg':   { vi:'Tin nhan da ma hoa',      en:'Encrypted Message' },
+  'btn-dec':      { vi:'Giai ma',                 en:'Decrypt' },
+  'lbl-decout':   { vi:'Noi dung goc',            en:'Original Content' },
+  'h-sign':       { vi:'Ky tin nhan',             en:'Sign Message' },
+  'lbl-signpriv': { vi:'Khoa bi mat cua ban',     en:'Your Private Key' },
+  'lbl-sign-file':{ vi:'Tai file .asc',           en:'Load .asc file' },
+  'lbl-signpass': { vi:'Cum mat khau (neu co)',   en:'Passphrase (if any)' },
+  'lbl-signmsg':  { vi:'Tin nhan can ky',         en:'Message to Sign' },
+  'btn-sign':     { vi:'Ky',                      en:'Sign' },
+  'lbl-signout':  { vi:'Chu ky',                  en:'Signature' },
+  'cp-sign':      { vi:'Sao chep',               en:'Copy' },
+  'h-verify':     { vi:'Xac minh chu ky',         en:'Verify Signature' },
+  'lbl-verpub':   { vi:'Khoa cong khai nguoi ky', en:"Signer's Public Key" },
+  'lbl-ver-file': { vi:'Tai file .asc',           en:'Load .asc file' },
+  'lbl-versigned':{ vi:'Tin nhan da ky',          en:'Signed Message' },
+  'btn-verify':   { vi:'Xac minh',               en:'Verify' }
+};
+
+var MSG = {
+  generating: { vi:'Dang tao khoa...', en:'Generating keys...' },
+  keydone:    { vi:'Tao khoa thanh cong!', en:'Keys generated!' },
+  encrypting: { vi:'Dang ma hoa...', en:'Encrypting...' },
+  encdone:    { vi:'Ma hoa thanh cong!', en:'Encrypted!' },
+  decrypting: { vi:'Dang giai ma...', en:'Decrypting...' },
+  decdone:    { vi:'Giai ma thanh cong!', en:'Decrypted!' },
+  signing:    { vi:'Dang ky...', en:'Signing...' },
+  signdone:   { vi:'Ky thanh cong!', en:'Signed!' },
+  verifying:  { vi:'Dang xac minh...', en:'Verifying...' },
+  verifyok:   { vi:'Chu ky hop le!', en:'Valid signature!' },
+  verifyfail: { vi:'Chu ky khong hop le!', en:'Invalid signature!' },
+  copied:     { vi:'Da sao chep', en:'Copied' },
+  error:      { vi:'Loi: ', en:'Error: ' },
+  needpub:    { vi:'Vui long nhap khoa cong khai', en:'Please enter a public key' },
+  needmsg:    { vi:'Vui long nhap tin nhan', en:'Please enter a message' },
+  needpriv:   { vi:'Vui long nhap khoa bi mat', en:'Please enter a private key' },
+  needenc:    { vi:'Vui long nhap tin nhan da ma hoa', en:'Please enter the encrypted message' }
+};
+
+function tx(k) { return MSG[k][lang]; }
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(function(b) {
+    var isVI = b.textContent.indexOf('VI') >= 0;
+    b.classList.toggle('active', (l === 'vi' && isVI) || (l === 'en' && !isVI));
+  });
+  Object.keys(LABELS).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = LABELS[id][l];
+  });
+}
+
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.getElementById('sec-' + id).classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+function setStatus(id, msg, ok) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '<div class="status ' + (ok ? 'ok' : 'err') + '">' + msg + '</div>';
+}
+
+function cleanKey(raw) {
+  if (!raw) return '';
+
+  let s = raw.trim();
+
+  // remove quote nếu có
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1);
+  }
+
+  // 🔥 xử lý tất cả escape từ Java / JSON
+  try {
+    // parse nếu là string JSON
+    s = JSON.parse(`"${s.replace(/"/g, '\\"')}"`);
+  } catch (e) {
+    // fallback nếu parse fail
+  }
+
+  // 🔥 clean tiếp
+  s = s
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '')
+    .replace(/\\\n/g, '\n')
+    .replace(/\\$/gm, '');
+
+  // 🔥 loại bỏ ký tự rác trong base64
+  s = s
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .join('\n');
+
+  return s.trim();
+}
+
+function checkKeyType(textarea, expectedType, warnId) {
+  var val = textarea.value.trim();
+  var warn = document.getElementById(warnId);
+  if (!warn) return;
+  warn.style.display = (expectedType === 'PUBLIC' && val.indexOf('PRIVATE KEY') >= 0) ? 'block' : 'none';
+}
+
+function loadFile(event, targetId) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var el = document.getElementById(targetId);
+    if (el) {
+      el.value = e.target.result.trim();
+      if (targetId === 'enc-pubkey') {
+        checkKeyType(el, 'PUBLIC', 'enc-warn');
+      }
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function copyText(id, btn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function() {
+    if (btn) {
+      var orig = btn.textContent;
+      btn.textContent = tx('copied');
+      setTimeout(function() { btn.textContent = orig; }, 1500);
+    }
+  });
+}
+
+async function generateKeys() {
+  var name = document.getElementById('kg-name').value.trim() || 'User';
+  var pass = document.getElementById('kg-pass').value;
+  setStatus('kg-status', tx('generating'), true);
+  try {
+    var r = await openpgp.generateKey({
+      type: 'rsa', rsaBits: 2048,
+      userIDs: [{ name: name }],
+      passphrase: pass || undefined
+    });
+    document.getElementById('out-pub').textContent = r.publicKey;
+    document.getElementById('out-priv').textContent = r.privateKey;
+    document.getElementById('kg-out').style.display = 'block';
+    setStatus('kg-status', tx('keydone'), true);
+  } catch (e) { setStatus('kg-status', tx('error') + e.message, false); }
+}
+
+async function encryptMsg() {
+  try {
+    let pubRaw = document.getElementById('enc-pubkey').value;
+    let rawMsg = document.getElementById('enc-msg').value;
+
+    if (!pubRaw) {
+      setStatus('enc-status', tx('needpub'), false);
+      return;
+    }
+
+    if (!rawMsg.trim()) {
+      setStatus('enc-status', tx('needmsg'), false);
+      return;
+    }
+
+    setStatus('enc-status', tx('encrypting'), true);
+
+    let pub = cleanKey(pubRaw);
+
+    if (!pub.includes('BEGIN PGP PUBLIC KEY BLOCK')) {
+      throw new Error('Key không đúng định dạng PUBLIC KEY');
+    }
+
+    // 🔥 convert JSON -> string
+    let msg;
+    try {
+      msg = JSON.stringify(JSON.parse(rawMsg), null, 2);
+    } catch (e) {
+      msg = rawMsg.trim();
+    }
+
+    const publicKey = await openpgp.readKey({
+      armoredKey: pub
+    });
+
+    const message = await openpgp.createMessage({
+      text: msg
+    });
+
+    const encrypted = await openpgp.encrypt({
+      message,
+      encryptionKeys: publicKey,
+      format: 'armored'
+    });
+
+    document.getElementById('out-enc').textContent = encrypted;
+    document.getElementById('enc-out').style.display = 'block';
+
+    setStatus('enc-status', tx('encdone'), true);
+
+  } catch (e) {
+    console.error(e);
+    setStatus('enc-status', tx('error') + e.message, false);
+  }
+}
+
+async function decryptMsg() {
+  var priv = cleanKey(document.getElementById('dec-privkey').value);
+  var pass = document.getElementById('dec-pass').value;
+  var enc  = cleanKey(document.getElementById('dec-msg').value);
+  if (!priv) { setStatus('dec-status', tx('needpriv'), false); return; }
+  if (!enc)  { setStatus('dec-status', tx('needenc'), false); return; }
+  setStatus('dec-status', tx('decrypting'), true);
+  try {
+    var privKey = await openpgp.decryptKey({
+      privateKey: await openpgp.readPrivateKey({ armoredKey: priv }),
+      passphrase: pass || undefined
+    });
+    var result = await openpgp.decrypt({
+      message: await openpgp.readMessage({ armoredMessage: enc }),
+      decryptionKeys: privKey
+    });
+    document.getElementById('out-dec').textContent = result.data;
+    document.getElementById('dec-out').style.display = 'block';
+    setStatus('dec-status', tx('decdone'), true);
+  } catch (e) { setStatus('dec-status', tx('error') + e.message, false); }
+}
+
+async function signMsg() {
+  var priv = cleanKey(document.getElementById('sign-privkey').value);
+  var pass = document.getElementById('sign-pass').value;
+  var msg  = document.getElementById('sign-msg').value.trim();
+  if (!priv) { setStatus('sign-status', tx('needpriv'), false); return; }
+  if (!msg)  { setStatus('sign-status', tx('needmsg'), false); return; }
+  setStatus('sign-status', tx('signing'), true);
+  try {
+    var privKey = await openpgp.decryptKey({
+      privateKey: await openpgp.readPrivateKey({ armoredKey: priv }),
+      passphrase: pass || undefined
+    });
+    var signed = await openpgp.sign({
+      message: await openpgp.createCleartextMessage({ text: msg }),
+      signingKeys: privKey
+    });
+    document.getElementById('out-sign').textContent = signed;
+    document.getElementById('sign-out').style.display = 'block';
+    setStatus('sign-status', tx('signdone'), true);
+  } catch (e) { setStatus('sign-status', tx('error') + e.message, false); }
+}
+
+async function verifyMsg() {
+  var pub    = cleanKey(document.getElementById('ver-pubkey').value);
+  var signed = cleanKey(document.getElementById('ver-msg').value);
+  if (!pub)    { setStatus('ver-status', tx('needpub'), false); return; }
+  if (!signed) { setStatus('ver-status', tx('needmsg'), false); return; }
+  setStatus('ver-status', tx('verifying'), true);
+  try {
+    var pubKey = await openpgp.readKey({ armoredKey: pub });
+    var result = await openpgp.verify({
+      message: await openpgp.readCleartextMessage({ cleartextMessage: signed }),
+      verificationKeys: pubKey
+    });
+    await result.signatures[0].verified;
+    setStatus('ver-status', tx('verifyok'), true);
+  } catch (e) { setStatus('ver-status', tx('verifyfail'), false); }
+}
+</script>
+</body>
+</html>
