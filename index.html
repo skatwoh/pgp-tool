@@ -207,6 +207,7 @@ h3 { font-size:13px; font-weight:500; color:var(--text2); font-family:var(--font
     <div id="dec-out" style="display:none;margin-top:1rem">
       <div class="field-label" id="lbl-decout">Noi dung goc</div>
       <div class="output-box" id="out-dec"></div>
+      <div class="actions"><button class="btn btn-sm" onclick="copyText('out-dec',this)" id="cp-dec">Sao chep</button></div>
     </div>
   </div>
 
@@ -316,6 +317,7 @@ var LABELS = {
   'btn-sign':     { vi:'Ky',                      en:'Sign' },
   'lbl-signout':  { vi:'Chu ky',                  en:'Signature' },
   'cp-sign':      { vi:'Sao chep',               en:'Copy' },
+  'cp-dec':       { vi:'Sao chep',               en:'Copy' },
   'h-verify':     { vi:'Xac minh chu ky',         en:'Verify Signature' },
   'lbl-verpub':   { vi:'Khoa cong khai nguoi ky', en:"Signer's Public Key" },
   'lbl-ver-file': { vi:'Tai file .asc',           en:'Load .asc file' },
@@ -588,7 +590,13 @@ async function decryptMsg() {
     document.getElementById('out-dec').textContent = result.data;
     document.getElementById('dec-out').style.display = 'block';
     setStatus('dec-status', tx('decdone'), true);
-  } catch (e) { setStatus('dec-status', tx('error') + e.message, false); }
+  } catch (e) {
+    let msg = e.message;
+    if (msg.includes('Session key decryption failed')) {
+      msg += (lang === 'vi' ? ' (Có thể do sai khóa bí mật hoặc cụm mật khẩu)' : ' (Possible wrong private key or passphrase)');
+    }
+    setStatus('dec-status', tx('error') + msg, false);
+  }
 }
 
 async function signMsg() {
