@@ -395,38 +395,45 @@ function cleanKey(raw) {
     .replace(/\\(?:\r\n|\n)/g, '')
     .replace(/\\$/gm, '');
 
-  // 🔥 loại bỏ ký tự rác trong base64
-  s = s
-    .split('\n')
-    .map(line => line.trim())
-    .join('\n');
+  // 🔥 loại bỏ ký tự rác, đưa về mảng các dòng sạch
+  const allLines = s.split('\n').map(l => l.trim()).filter(l => l !== '');
 
-  // Ensure exactly one empty line after headers if headers exist
-  if (s.includes('-----BEGIN PGP')) {
-    const lines = s.split('\n');
-    let headerEndIndex = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('-----BEGIN PGP')) continue;
-      if (lines[i].includes(':')) continue;
-      if (lines[i].trim() === '') {
-        headerEndIndex = i;
-        break;
-      }
-      // If we hit base64 without an empty line
-      if (/^[A-Za-z0-9+/=]+$/.test(lines[i]) && lines[i].length > 20) {
-        headerEndIndex = i;
-        break;
-      }
-    }
+  if (allLines.length === 0) return '';
 
-    if (headerEndIndex !== -1) {
-      const headers = lines.slice(0, headerEndIndex).filter(l => l.trim() !== '');
-      const body = lines.slice(headerEndIndex).filter(l => l.trim() !== '');
-      s = headers.join('\n') + '\n\n' + body.join('\n');
-    }
+  let bodyStartIndex = -1;
+  for (let i = 0; i < allLines.length; i++) {
+    const line = allLines[i];
+    if (line.startsWith('-----BEGIN PGP')) continue;
+    if (line.includes(':')) continue;
+
+    // Nếu dòng này không phải header, thì nó là khởi đầu của body
+    bodyStartIndex = i;
+    break;
   }
 
-  return s.trim();
+  if (bodyStartIndex !== -1) {
+    const headers = allLines.slice(0, bodyStartIndex);
+    const body = allLines.slice(bodyStartIndex);
+
+    // Tách phần body thực sự (base64) và phần tail (-----END PGP...)
+    let realBody = [];
+    let tail = [];
+    for (let line of body) {
+      if (line.startsWith('-----END PGP')) {
+        tail.push(line);
+      } else {
+        if (tail.length === 0) {
+          realBody.push(line);
+        } else {
+          tail.push(line);
+        }
+      }
+    }
+
+    return headers.join('\n') + '\n\n' + realBody.join('\n') + (tail.length > 0 ? '\n' + tail.join('\n') : '');
+  }
+
+  return allLines.join('\n');
 }
 
 function formatKey(id) {
